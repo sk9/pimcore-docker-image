@@ -1,0 +1,40 @@
+map $args $static_page_root {
+    default                                 /var/tmp/pages;
+    "~*(^|&)pimcore_editmode=true(&|$)"     /var/nonexistent;
+    "~*(^|&)pimcore_preview=true(&|$)"      /var/nonexistent;
+    "~*(^|&)pimcore_version=[^&]+(&|$)"     /var/nonexistent;
+}
+
+map $uri $static_page_uri {
+    default                                 $uri;
+    "/"                                     /%home;
+}
+
+map $uri $auth_flag {
+    ~^/de-de/(.*) on;
+    default off;
+}
+
+# HTTP configuration
+#
+server {
+    server_name _;
+
+    auth_basic $auth_flag;
+    auth_basic_user_file /var/www/html/.htpasswd;
+
+	include /etc/nginx/site-opts.d/http.conf;
+
+    fastcgi_buffering off;
+}
+
+#server {
+#    auth_basic "Restricted";
+#    auth_basic_user_file /var/www/html/.htpasswd;
+#
+#    server_name ~^(.*)\.custom\.tld\.domain;
+#
+#    include /etc/nginx/site-opts.d/http.conf;
+#
+#    fastcgi_buffering off;
+#}

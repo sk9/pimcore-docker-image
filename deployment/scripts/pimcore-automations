@@ -1,0 +1,71 @@
+#!/command/with-contenv bash
+
+# Exit on error
+set -e
+
+# Check to see if an Artisan file exists and assume it means Laravel is configured.
+if [ -d $WEBUSER_HOME/config/pimcore ] && [ ${AUTORUN_ENABLED:="true"} == "true" ]; then
+        echo "🏃️ Checking for Pimcore automations..."
+
+        ############################################################################
+        # pvc setup kubernetes specific
+        ############################################################################
+        mkdir -p /chmodshare/var/email
+        mkdir -p /chmodshare/var/recyclebin
+        mkdir -p /chmodshare/var/tmp
+        mkdir -p /chmodshare/var/ecommerce
+        mkdir -p /chmodshare/var/versions
+        mkdir -p /chmodshare/public/var
+
+        # create tmp dir for sessions
+        mkdir -p /tmp/sessions
+
+        # make the symlinks into the container
+        ln -sfn /chmodshare/var/email $WEBUSER_HOME/var/email
+        ln -sfn /chmodshare/var/recyclebin $WEBUSER_HOME/var/recyclebin
+        ln -sfn /chmodshare/var/tmp $WEBUSER_HOME/var/tmp
+        ln -sfn /chmodshare/var/ecommerce $WEBUSER_HOME/var/ecommerce
+        ln -sfn /chmodshare/var/versions $WEBUSER_HOME/var/versions
+        ln -sfn /chmodshare/public/var $WEBUSER_HOME/public/var
+        chown -R 9999:9999 /chmodshare
+
+        ############################################################################
+        # Automated database migrations
+        ############################################################################
+        if [ ${AUTORUN_PIMCORE_MIGRATION:="false"} == "true" ]; then
+            echo "🚀 Running migrations..."
+            s6-setuidgid webuser php $WEBUSER_HOME/bin/console doctrine:migrations:migrate --prefix=Pimcore\\Bundle\\CoreBundle -n
+        fi
+
+        ############################################################################
+        # Automated assets linking
+        ############################################################################
+        if [ ${AUTORUN_SYMFONY_ASSETS_LINK:="true"} == "true" ]; then
+            if [ -L $WEBUSER_HOME/public/bundles ]; then
+                echo "✅ Assets already linked..."
+            else
+                echo "🔐 Linking the assets..."
+                s6-setuidgid webuser php $WEBUSER_HOME/bin/console assets:install --symlink --relative public
+            fi
+        fi
+
+        ############################################################################
+        # Cache warmup
+        ############################################################################
+        if [ ${AUTORUN_SYMFONY_CACHE_WARMUP:="true"} == "true" ]; then
+            echo "🏃 Cache Warmup ..."
+            s6-setuidgid webuser php $WEBUSER_HOME/bin/console cache:warmup --env=prod
+        fi
+
+        ############################################################################
+        # Automated pimcore classes rebuild
+        ############################################################################
+        if [ ${AUTORUN_PIMCORE_CLASSES_REBUILD:="true"} == "true" ]; then
+            echo "🏃 Pimcore classes rebuild ..."
+            s6-setuidgid webuser php $WEBUSER_HOME/bin/console pimcore:deployment:classes-rebuild -c -n
+        fi
+else
+    echo "👉 Skipping Pimcore automations because we could not detect a Pimcore install or it was specifically disabled..."
+fi
+
+exit 0

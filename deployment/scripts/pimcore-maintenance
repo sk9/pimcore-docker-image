@@ -1,0 +1,10 @@
+#!/command/with-contenv bash
+
+# Exit on error
+set -e
+
+echo "🚀 Running maintenance..."
+su webuser
+php $WEBUSER_HOME/bin/console pimcore:deployment:classes-rebuild -c
+php $WEBUSER_HOME/bin/console pimcore:maintenance
+exit 0
